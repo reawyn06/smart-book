@@ -1,4 +1,4 @@
-.env
+smartbook-backend/.env
 .venv/
 venv/
 env/
