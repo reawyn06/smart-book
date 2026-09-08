@@ -26,14 +26,14 @@
 │              SERVER MÁY CHỦ              │
 │                                          │
 │  ┌─────────────────┐      ┌───────────┐  │
-│  │ FastAPI Backend │◄────►│ Redis     │  │
-│  └──────┬─────┬────┘      │ (Cache)   │  │
+│  │ FastAPI Backend │◄────►│ Upstash   │  │
+│  └──────┬─────┬────┘      │Redis Cache│  │  
 │         │     │           └───────────┘  │
 │         │     │                          │
 │         │     ▼                          │
 │         │  ┌──────────────────────────┐  │
+│         │  │ Supabase (Cloud DB)      │  │
 │         │  │ PostgreSQL + pgvector    │  │
-│         │  │ (Data & AI Embeddings)   │  │
 │         │  └──────────────────────────┘  │
 │         │                                │
 └─────────┼────────────────────────────────┘
@@ -49,18 +49,18 @@
 
 ### 2. Công nghệ Chọn lựa (Technology Stack)
 
-| Thành phần | Công nghệ / Thư viện |
-| :--- | :--- | 
-| **Mobile App** | Flutter + Dart | 
-| **Local Storage** |SQLite (sqflite / drift) | 
-| **Architecture (Mobile)** | MVVM / Clean Architecture | 
-| **Backend API** | Python + FastAPI | 
-| **Database & Vector DB** | PostgreSQL + pgvector | 
-| **Caching** | Redis |
-| **Book Metadata API** | Google Books API | 
-| **Core Ebook Data** | Project Gutenberg |
-| **AI Engine** | Gemini API | 
-| **Authentication** | JWT (JSON Web Tokens) + RBAC |
+| Thành phần | Công nghệ / Thư viện                                                     |
+| :--- |:-------------------------------------------------------------------------| 
+| **Mobile App** | Flutter + Dart                                                           | 
+| **Local Storage** | SQLite (sqflite)                                                         | 
+| **Architecture (Mobile)** | MVVM / Clean Architecture                                                | 
+| **Backend API** | Python + FastAPI                                                         | 
+| **Database & Vector DB** | Supabase (PostgreSQL + pgvector)                                         | 
+| **Caching** | Upstash Redis (Serverless Cloud Cache)                                   |
+| **Book Metadata API** | Google Books API                                                         | 
+| **Core Ebook Data** | Project Gutenberg                                                        |
+| **AI Engine** | Gemini API                                                               | 
+| **Authentication** | JWT (JSON Web Tokens) + Phân quyền Admin/User                                                 |
 
 ---
 
@@ -209,17 +209,17 @@ lib/
 └── main.dart
 ```
 
-### 2. FastAPI Backend (`backend/`)
+### 2. FastAPI Backend (`smartbook-backend/`)
 
 ```text
-backend/
-├── app/
-│   ├── main.py       
-│   ├── routers/      # API endpoints (auth, books, ai)
-│   ├── services/     # Logic (google_books.py, gutenberg.py, gemini_rag.py)
-│   ├── models/       # SQLAlchemy/pgvector ORM models
-│   ├── schemas/      # Pydantic schemas
-│   └── database/     # DB Session
+smartbook-backend/
+├── main.py       
+├── routers/     
+├── ai_utils.py    
+├── models.py       
+├── schemas.py
+├── security.py     
+├── database.py       
 └── requirements.txt
 ```
 
@@ -242,50 +242,56 @@ backend/
 
 ## VIII. LỘ TRÌNH TRIỂN KHAI (PHASED ROADMAP)
 
-* **Phase 1 – Core Backend & CMS:** Thiết kế database schema, dựng FastAPI, tích hợp PostgreSQL, phân quyền JWT. Hoàn thiện luồng lấy sách tự động từ Gutenberg.
-* **Phase 2 – Core Mobile:** Dựng giao diện Flutter cơ bản: Login, Home, Library và Reader Screen lấy dữ liệu văn bản từ API.
-* **Phase 3 – Integration Book API:** Tích hợp Google Books API vào backend/mobile cho tính năng Search Screen và lấy Book Metadata.
-* **Phase 4 – AI Assistant (RAG System):** Cấu hình `pgvector`, xây dựng luồng chunking/embedding. Tích hợp Gemini API cho AI Assistant để hỏi đáp.
+* **Phase 1 – Core Backend & Cloud CMS:** Thiết kế database schema, dựng FastAPI, tích hợp Supabase (PostgreSQL), Upstash Redis Cache, phân quyền JWT và bảo mật `.env`. Hoàn thiện luồng import sách từ Google Books và Gutenberg.
+* **Phase 2 – Core Mobile:** Dựng giao diện Flutter cơ bản: Login, Home, Library và Reader Screen.
+* **Phase 3 – Integration API:** Ghép nối ứng dụng Mobile với FastAPI để gọi dữ liệu sách, đồng bộ tiến độ đọc.
+* **Phase 4 – AI Assistant (RAG System):** Cấu hình `pgvector`, xây dựng luồng chunking/embedding. Tích hợp Gemini API cho AI Assistant để hỏi đáp ngay trong lúc đọc sách.
 * **Phase 5 – AI Recommendation & Analytics:** Hoàn thiện Engine đề xuất sách dựa trên lịch sử đọc và màn hình Profile thống kê thói quen đọc.
-
 ---
 
 ## IX. THIẾT KẾ REST API ENDPOINTS (API SPECIFICATIONS)
 
-Hệ thống cung cấp các API RESTful được bảo mật bằng JWT, phân chia theo từng module nghiệp vụ cụ thể.
+Hệ thống cung cấp các API RESTful được phân chia theo từng module nghiệp vụ cụ thể. Các endpoint có yêu cầu bảo mật sẽ được bảo vệ bằng JWT.
 
 ### 1. Authentication (Xác thực người dùng)
-* `POST /api/auth/register` : Đăng ký tài khoản mới.
-* `POST /api/auth/login` : Đăng nhập, trả về JWT Access Token và Refresh Token.
-### 2. Users (Người dùng)
-* `GET /api/users/me` : Lấy thông tin profile người dùng hiện tại (yêu cầu Token).
+* `POST /register` : Đăng ký tài khoản người dùng mới.
+* `POST /login` : Đăng nhập vào hệ thống để nhận Access Token.
 
-### 3. Book (Khám phá sách)
-* `GET /api/books` : Lấy sách trong Database.
-* `GET /api/books/search` : Tìm kiếm sách trong Database.
-* `POST /api/books/{book_id}/chat` : Chat với AI về nội dung sách.
-* `GET /api/books/{book_id}/chat/history` : Lấy lịch sử chat của user với cuốn sách.
-* `DELETE /api/books/{book_id}/chat/history` : Xóa lịch xử của user với cuốn sách.
-* `GET /api/books/{book_id}/read` : Tải nội dung chi tiết của sách để đọc.
+### 2. Users (Người dùng)
+* `GET /users/me` : Lấy thông tin profile của người dùng hiện tại (yêu cầu Token).
+
+### 3. Books (Khám phá sách)
+* `GET /books` : Lấy danh sách sách hiện có trong hệ thống.
+* `GET /books/search` : Tìm kiếm sách lưu trữ tại Local.
+* `GET /books/author/{author_name}` : Lấy danh sách sách dựa theo tên tác giả.
+* `POST /books/{book_id}/chat` : Trò chuyện với AI về nội dung của cuốn sách.
+* `GET /books/{book_id}/chat/history` : Lấy lịch sử trò chuyện với cuốn sách.
+* `DELETE /books/{book_id}/chat/history` : Xóa lịch sử trò chuyện với cuốn sách.
+* `GET /books/{book_id}/read` : Mở sách để tải nội dung đọc chi tiết.
+* `GET /books/{book_id}/similar` : Lấy danh sách các cuốn sách tương tự.
+* `GET /books/discover/ai` : Khám phá và tìm kiếm sách thông qua AI.
 
 ### 4. User Library (Tủ sách cá nhân)
-* `GET /api/library` : Lấy danh sách sách người dùng đã lưu (lọc theo trạng thái Reading, Done, Wishlist).
-* `POST /api/library/add` : Thêm một cuốn sách vào tủ sách cá nhân.
-* `PUT /api/library/{book_id}/favorite` : Thêm một cuốn sách vào mục yêu thích.
-* `POST /api/library/highlights` : Lưu lại các đoạn văn bản (text) được người dùng highlight kèm ghi chú.
-* `PUT /api/library/{book_id}/progress` : Cập nhật tiến độ đọc (lưu số % đã đọc của cuốn sách đó).
-* `GET /api/library/{book_id}/highlights` : Xem highlights mà người dùng đã tạo.
-* `DELETE /api/library/highlights/{highlight_id}` : Xóa highlights mà người dùng đã tạo.
-* `DELETE /api/library/{book_id}` : Xóa sách mà người dùng đã thêm.
+* `GET /library/` : Lấy danh sách thư viện cá nhân của người dùng.
+* `POST /library/add` : Thêm một cuốn sách vào thư viện cá nhân.
+* `PUT /library/{book_id}/favorite` : Bật/tắt trạng thái yêu thích cho cuốn sách.
+* `POST /library/highlights` : Lưu lại các đoạn văn bản (text) được đánh dấu.
+* `PUT /library/{book_id}/progress` : Cập nhật tiến độ đọc sách.
+* `GET /library/{book_id}/highlights` : Lấy danh sách các đoạn highlight của một cuốn sách.
+* `DELETE /library/highlights/{highlight_id}` : Xóa một đoạn highlight đã lưu.
+* `DELETE /library/{book_id}` : Xóa cuốn sách khỏi thư viện cá nhân.
+* `GET /library/authors` : Lấy danh sách các tác giả yêu thích.
+* `POST /library/authors` : Thêm một tác giả vào danh sách yêu thích.
+* `DELETE /library/authors/{author_name}` : Xóa một tác giả khỏi danh sách yêu thích.
+* `GET /library/recommendations` : Lấy danh sách sách đề xuất từ AI (AI Recommendations).
 
-### 5. AI Service (Trợ lý thông minh)
-* `GET /api/ai/recommendations` : Lấy danh sách sách đề xuất dựa trên lịch sử đọc (AI Recommendation).
-* `POST /api/ai/quick-action` : Endpoint xử lý các tác vụ nhanh từ Context Toolbar (dịch, giải thích từ vựng, tóm tắt đoạn văn).
+### 5. AI Assistant (Trợ lý thông minh)
+* `POST /ai/quick-action` : Endpoint xử lý các tác vụ nhanh từ AI (Ai Quick Action).
 
 ### 6. Admin Panel (Dành riêng cho Quản trị viên)
-* `GET /api/admin/books/search/google` : Gửi yêu cầu tên sách vào API của Google Books để lấy về sách mong muốn.
-* `POST /api/admin/books/import/{google_book_id}` : Import thông tin sách từ Google Book API vào Database.
-* `POST /api/admin/books/{book_id}/sync-gutenberg/{gutenberg_id}` : Import nội dung sách từ Project Gutenberg vào Database dưới dạng link html.
-* `POST /api/admin/books/{book_id}/process-ai` : Tách nội dung sách thành các vectơ đặc trưng phục vụ cho việc hỏi AI Assistance.
-* `POST /api/admin/books/{book_id}/search-debug` : Kiểm tra và gỡ lỗi (debug) quá trình tìm kiếm ngữ nghĩa (Semantic Search) của hệ thống RAG.
-* `DELETE /api/admin/books/{book_id}` : Xóa sách ra khỏi hệ thống.
+* `GET /admin/books/search/google` : Tìm kiếm sách trực tiếp thông qua Google Books API.
+* `POST /admin/books/import/{google_book_id}` : Nhập (import) dữ liệu sách từ Google vào hệ thống.
+* `POST /admin/books/{book_id}/sync-gutenberg/{gutenberg_id}` : Đồng bộ nội dung sách gốc từ Project Gutenberg.
+* `POST /admin/books/{book_id}/process-ai` : Xử lý dữ liệu sách để phục vụ cho AI.
+* `POST /admin/books/{book_id}/search-debug` : Kiểm tra và gỡ lỗi (debug) quá trình tìm kiếm ngữ nghĩa.
+* `DELETE /admin/books/{book_id}` : Quản trị viên xóa sách khỏi hệ thống.
